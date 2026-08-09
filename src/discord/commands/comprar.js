@@ -1,13 +1,17 @@
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
+const { isAdmin } = require("../../utils/permissions");
 const { shopPanel } = require("../storePanel");
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("comprar")
-        .setDescription("Comprar uma key do hub"),
+        .setDescription("[admin] Posta o painel fixo da loja nesse canal"),
 
     async execute(interaction) {
-        const payload = shopPanel();
-        return interaction.reply({ ...payload, flags: payload.flags | MessageFlags.Ephemeral });
+        if (!isAdmin(interaction)) {
+            return interaction.reply({ content: "❌ Só admins podem postar o painel da loja.", ephemeral: true });
+        }
+        await interaction.channel.send(shopPanel());
+        return interaction.reply({ content: "✅ Painel da loja postado.", ephemeral: true });
     }
 };

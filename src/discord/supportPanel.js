@@ -191,6 +191,19 @@ async function handleButton(interaction) {
                 permissionOverwrites: overwrites
             });
 
+            // O bot já entra sozinho na call — assim ela não fica "vazia"
+            // esperando alguém entrar primeiro.
+            try {
+                const { joinVoiceChannel } = require("@discordjs/voice");
+                joinVoiceChannel({
+                    channelId: call.id,
+                    guildId: interaction.guild.id,
+                    adapterCreator: interaction.guild.voiceAdapterCreator
+                });
+            } catch (voiceErr) {
+                logger.warn(`Call criada, mas o bot não conseguiu entrar sozinho -> ${voiceErr.message}`);
+            }
+
             await interaction.reply({ content: `📞 Call privada criada: ${call}` });
         } catch (err) {
             logger.error(`Falha ao criar call de suporte -> ${err.message}`);

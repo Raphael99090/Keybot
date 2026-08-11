@@ -1,37 +1,100 @@
 # Changelog — 1NXITER KeyBot
 
-## [Não lançado]
+## v4.1.0 — PushinPay como gateway de Pix automático
 
-### Adicionado — segurança, resiliência e UX do painel
-- **Segredo na API `/validate`**: `API_SECRET` no `.env`, checado via
-  header `X-API-Key` ou `?secret=`. Desativado por padrão (compatível
-  com quem já tinha o bot rodando), mas recomendado em produção.
-- **`config.js` aceita `process.env.PORT`**, com prioridade sobre
-  `API_PORT` — necessário pra hospedagens (Railway, etc.) que injetam a
-  porta automaticamente.
-- **Validação de ambiente ao iniciar** (`utils/validator.js`):
-  `DISCORD_TOKEN`/`CLIENT_ID` faltando encerra o processo com mensagem
-  clara; `GUILD_ID`/`ADMIN_ROLE_ID` faltando só avisa o trade-off.
-- **Backup automático de JSON corrompido** (`utils/jsonFile.js`): se
-  qualquer arquivo de dados vier corrompido, salva uma cópia
-  (`.bak-<timestamp>`) e reseta pro padrão, em vez de derrubar o bot.
-  As 4 stores (`keyStore`, `settingsStore`, `resetCodeStore`,
-  `trialStore`) foram refatoradas pra usar esse helper único — é a
-  camada de abstração que permite trocar por um banco de dados de
-  verdade no futuro sem tocar nas stores.
-- **Cooldown com precisão** (`utils/format.js` → `fmtDuration`): mostra
-  "1h 23min" / "45min" / "30s" em vez de arredondar tudo pra hora cheia.
-- **Confirmação antes de ações destrutivas**: revogar key e limpar
-  dados antigos (`purge`) agora mostram uma prévia do que será afetado
-  e exigem clique em "Confirmar" — `KeyStore.previewPurge()` calcula a
-  prévia sem apagar nada.
-- **Paginação na listagem de keys**: painel `/admin` → Listar Keys
-  agora mostra 10 por página com botões Anterior/Próximo, em vez de
-  cortar silenciosamente em 25.
+### Adicionado
+- **PushinPay** como segundo gateway de Pix automático
+  (`PUSHINPAY_API_TOKEN` no `.env`), com prioridade sobre o Mercado Pago
+  quando os dois estão configurados — mais simples de configurar (não
+  exige conta empresarial verificada). Nova camada `pixProvider.js`
+  escolhe qual gateway usar automaticamente; o resto do bot não precisa
+  saber qual dos dois está ativo.
 
-### Alterado
-- `main.lua` do hub atualizado: envia `&secret=` na validação (se
-  `API_SECRET` configurado) e trata o motivo `unauthorized`.
+## v4.0.0 — Suporte, Painéis Fixos, Dashboard e Voz
+
+### ⚠️ Breaking changes
+- **`/comprar` e `/suporte` agora são comandos de admin** que postam um
+  **painel fixo** no canal, em vez de responder efêmero pra quem
+  digitar. Os usuários passam a interagir clicando nos botões da
+  mensagem fixa, não rodando o comando eles mesmos.
+
+### Adicionado
+- **Sistema de ticket de suporte geral**, separado do de compra:
+  painel fixo (`/suporte`, admin), dois tipos escolhidos pelo usuário
+  (Dúvidas / Suporte Compra), e dentro do ticket um painel só de admin
+  com **criar call de voz privada** (o bot entra sozinho nela),
+  **adicionar/remover pessoas** da thread, e **marcar quem abriu** o
+  ticket. Membros comuns só conseguem usar "Fechar Ticket".
+- **`/conectar`** — faz o bot entrar numa call de voz (a do próprio
+  usuário ou uma escolhida via opção).
+- **Dashboard privado** (site estático, hospedável de graça no
+  Vercel): visão geral, vendas, keys, cupons, avaliações e logs — via
+  novas rotas `GET /dashboard/*` protegidas por senha (`DASHBOARD_PASSWORD`)
+  e CORS restrito por origem.
+- **Termos de uso antes da compra**: tela de aceite entre o cupom e a
+  criação do ticket; cancelar não consome o cupom.
+- **Imagem de agradecimento** configurável, mostrada na DM de entrega
+  da key.
+- **Pesquisa de satisfação** (estrelas + comentário opcional), enviada
+  só por DM quando um ticket de compra concluída fecha; média exibida
+  na loja como prova social.
+- **Fechamento automático de tickets**: compra fecha 10s após
+  confirmar (ou sozinha em 3min sem mensagens); suporte fecha em 15min
+  sem mensagens. Ambos postam um transcript `.txt` no canal de log
+  antes de apagar o canal.
+- **Backup automático do banco** a cada 24h via `VACUUM INTO`, mantendo
+  os 7 mais recentes.
+- **Aviso de renovação por DM**, 2 dias antes da key vencer.
+- **Estatísticas por plano e faturamento** (via Pix automático) no
+  `/admin`.
+- Botões agora aninham dentro do container (Components V2) em vez de
+  aparecer soltos abaixo dele.
+
+## v3.0.0 — SQLite, Components V2, Loja com Tickets
+
+### ⚠️ Breaking changes
+- **Banco de dados trocado de JSON pra SQLite** (`node:sqlite`, nativo
+  do Node — zero dependência npm, zero compilação). Os dados antigos
+  em `data/*.json` **não migram automaticamente**.
+- **`/comprar` foi redesenhado do zero**: o fluxo antigo (escolher
+  método de pagamento → DM → "Já paguei" → canal de vendas) deixou de
+  existir. Agora é: escolher um **plano** (1 dia/7 dias/30 dias/
+  lifetime) → cupom opcional → **ticket privado em thread**.
+  `salesChannelId` foi removido; `ticketChannelId` faz esse papel agora.
+- **Toda a interface migrou pra Discord Components V2** — visual novo
+  (containers com markdown em vez de embeds clássicos).
+
+### Adicionado
+- **SQLite nativo** (`src/db.js`): todas as 5 stores + a nova de
+  cupons viraram tabelas SQL, mesma API pública de antes.
+- **Components V2** em todo o bot (`discord/v2.js`), com botões
+  aninhados dentro do container (não soltos abaixo).
+- **Loja com 4 planos configuráveis** — preço, descrição e imagem
+  editáveis via painel (`/admin → Vendas/Pagamentos → 🛍️ Configurar
+  Loja`), com dropdown pra escolher qual plano editar.
+- **Ticket por compra em thread**: privada quando o servidor tem boost
+  nível 2, com fallback automático pra pública quando não tem.
+- **Sistema de cupom**: código opcional na compra, com limite de usos
+  configurável; desconto aparece no ticket pro admin aplicar na hora
+  de cobrar.
+- **Pix automático via Mercado Pago** (opcional): com
+  `MERCADOPAGO_ACCESS_TOKEN` configurado, o admin gera Pix de verdade
+  (QR Code + copia-e-cola) dentro do ticket, e a key é liberada sozinha
+  quando o pagamento aprova — sem precisar clicar em nada.
+- **Apagar TODAS as keys**, com confirmação por texto (`APAGAR`) além
+  do clique, pra evitar acidente.
+- **Logs com painel completo**: quem fez, quando (timestamp nativo do
+  Discord) e a validade da key envolvida, em todas as ações que geram
+  ou renovam key.
+- Segredo na API `/validate` (`API_SECRET`), suporte a `process.env.PORT`
+  pra hospedagens que injetam a porta, validação de `.env` ao iniciar,
+  cooldown de reset com precisão de minutos/segundos, paginação na
+  listagem de keys, e confirmação com prévia antes de revogar/limpar.
+
+### Removido
+- Fluxo antigo de `/comprar` por método de pagamento (Pix/BTC/Cartão/
+  Local como primeira escolha) e o botão "Já paguei".
+- Armazenamento em JSON (`utils/jsonFile.js`) — tudo em SQLite agora.
 
 ## v2.0.0 — Painel Admin + Monetização
 

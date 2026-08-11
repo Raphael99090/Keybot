@@ -17,6 +17,9 @@ module.exports = {
     // Pix automático fica desativado, e o fluxo cai pro botão manual de
     // "Confirmar Pagamento" que já existia.
     mercadoPagoAccessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || null,
+    // Token da API do PushinPay (pushinpay.com.br). Se configurado,
+    // tem prioridade sobre o Mercado Pago pro Pix automático.
+    pushinPayToken: process.env.PUSHINPAY_API_TOKEN || null,
     // Senha do dashboard privado (Vercel). Vazio = dashboard inteiro
     // desativado (todas as rotas /dashboard/* respondem 401).
     dashboardPassword: process.env.DASHBOARD_PASSWORD || null,

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, ChannelType } = require("discord.js");
 const { joinVoiceChannel } = require("@discordjs/voice");
-const { isAdmin } = require("../../utils/permissions");
+// Mudei o caminho abaixo. Tente "../" primeiro.
+const { isAdmin } = require("../utils/permissions"); 
 
 module.exports = {
     data: new SlashCommandBuilder()

@@ -10,7 +10,7 @@ function rowToEntry(row) {
 }
 
 const stmts = {
-    insert: db.prepare(`INSERT INTO orders (id, discordId, plan, channelId, status, createdAt, decidedAt, decidedBy, generatedKey, couponCode, lastActivityAt) VALUES (?, ?, ?, ?, 'open', ?, NULL, NULL, NULL, ?, ?)`),
+    insert: db.prepare(`INSERT INTO orders (id, discordId, plan, channelId, status, createdAt, decidedAt, decidedBy, generatedKey, couponCode, lastActivityAt, productId) VALUES (?, ?, ?, ?, 'open', ?, NULL, NULL, NULL, ?, ?, ?)`),
     get: db.prepare(`SELECT * FROM orders WHERE id = ?`),
     getByChannel: db.prepare(`SELECT * FROM orders WHERE channelId = ?`),
     all: db.prepare(`SELECT * FROM orders`),
@@ -21,18 +21,18 @@ const stmts = {
 /**
  * Formato de cada pedido/ticket:
  * { id, discordId, plan, channelId, status, createdAt, decidedAt,
- *   decidedBy, generatedKey, couponCode, lastActivityAt }
+ *   decidedBy, generatedKey, couponCode, lastActivityAt, productId }
  */
 
 const OrderStore = {
-    create({ discordId, plan, channelId, couponCode = null }) {
+    create({ discordId, plan, channelId, couponCode = null, productId = null }) {
         let id;
         do {
             id = generateId();
         } while (stmts.get.get(id));
 
         const now = Date.now();
-        stmts.insert.run(id, discordId, plan, channelId, now, couponCode, now);
+        stmts.insert.run(id, discordId, plan, channelId, now, couponCode, now, productId);
         return rowToEntry(stmts.get.get(id));
     },
 

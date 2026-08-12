@@ -20,6 +20,9 @@ module.exports = {
     // Token da API do PushinPay (pushinpay.com.br). Se configurado,
     // tem prioridade sobre o Mercado Pago pro Pix automático.
     pushinPayToken: process.env.PUSHINPAY_API_TOKEN || null,
+    // Chave da API da Grok (xAI). Vazio = a IA no ticket de suporte
+    // fica desativada (nenhuma mensagem automática é enviada).
+    grokApiKey: process.env.GROK_API_KEY || null,
     // Senha do dashboard privado (Vercel). Vazio = dashboard inteiro
     // desativado (todas as rotas /dashboard/* respondem 401).
     dashboardPassword: process.env.DASHBOARD_PASSWORD || null,

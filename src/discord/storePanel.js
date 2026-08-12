@@ -13,6 +13,7 @@ const KeyStore = require("../store/keyStore");
 const SettingsStore = require("../store/settingsStore");
 const OrderStore = require("../store/orderStore");
 const CouponStore = require("../store/couponStore");
+const ProductStore = require("../store/productStore");
 const { isAdmin } = require("../utils/permissions");
 const { fmtDate } = require("../utils/format");
 const logger = require("../utils/logger");
@@ -25,25 +26,23 @@ const ReviewStore = require("../store/reviewStore");
 
 const { PLAN_LABELS, PLAN_DAYS, PAYMENT_METHODS } = SettingsStore;
 
-function priceLine(plan) {
-    const price = SettingsStore.getPlanPrice(plan);
-    return price || "preço a definir";
+function priceLine(product, plan) {
+    return product.plans?.[plan] || "preço a definir";
 }
 
-function planButtonsRow() {
+function planButtonsRow(product) {
     return new ActionRowBuilder().addComponents(
         Object.keys(PLAN_LABELS).map(plan =>
             new ButtonBuilder()
-                .setCustomId(`store:buy:${plan}`)
-                .setLabel(`${PLAN_LABELS[plan]} — ${priceLine(plan)}`)
+                .setCustomId(`store:buy:${product.id}:${plan}`)
+                .setLabel(`${PLAN_LABELS[plan]} — ${priceLine(product, plan)}`)
                 .setStyle(plan === "lifetime" ? ButtonStyle.Success : ButtonStyle.Primary)
         )
     );
 }
 
-/** Painel público/pessoal da loja — os 4 planos com preço já no botão. */
-function shopPanel() {
-    const description = SettingsStore.get("shopDescription") || "Escolha um plano abaixo pra comprar sua key.";
+/** Painel de planos de UM produto específico. */
+function productPlanPanel(product) {
     const reviews = ReviewStore.list();
     const avg = ReviewStore.averageStars();
     const starsLine = avg !== null
@@ -51,12 +50,43 @@ function shopPanel() {
         : "";
 
     const container = panel({
-        title: "🛒 Loja — 1NXITER HUB",
-        description: `${description}${starsLine}\n\n**🛒 Compre aqui:**`,
-        imageUrl: SettingsStore.get("shopImageUrl") || null,
+        title: `🛒 ${product.name}`,
+        description: `${product.description || "Escolha um plano abaixo pra comprar sua key."}${starsLine}\n\n**🛒 Compre aqui:**`,
+        imageUrl: product.imageUrl || null,
         footer: "Ao escolher um plano, um ticket privado é criado só pra você e a administração."
     });
-    return v2Payload(container, [planButtonsRow()]);
+    return v2Payload(container, [planButtonsRow(product)]);
+}
+
+/**
+ * Painel principal da loja. Se só existir 1 produto ativo, vai direto
+ * pros planos dele (experiência igual a antes, sem clique extra). Com
+ * mais de 1, mostra um catálogo pra escolher qual produto primeiro.
+ */
+function shopPanel() {
+    const products = ProductStore.listActive();
+
+    if (products.length === 0) {
+        const empty = panel({ title: "🛒 Loja", description: "Nenhum produto configurado ainda — fala com a administração." });
+        return v2Payload(empty, []);
+    }
+
+    if (products.length === 1) {
+        return productPlanPanel(products[0]);
+    }
+
+    const container = panel({
+        title: "🛒 Loja — Catálogo",
+        description: "Escolha um produto abaixo pra ver os planos:"
+    });
+    const rows = [];
+    for (let i = 0; i < products.length; i += 5) {
+        const slice = products.slice(i, i + 5);
+        rows.push(new ActionRowBuilder().addComponents(
+            slice.map(p => new ButtonBuilder().setCustomId(`store:viewproduct:${p.id}`).setLabel(p.name).setStyle(ButtonStyle.Primary))
+        ));
+    }
+    return v2Payload(container, rows);
 }
 
 function paymentReferenceText() {
@@ -126,14 +156,15 @@ function autopixModal(orderId) {
 }
 
 /**
- * Gera a key, vincula ao comprador, marca o pedido como confirmado e
- * manda a key por DM. Usado tanto pelo clique manual em "Confirmar
- * Pagamento" quanto pela aprovação automática do Pix — os dois
- * caminhos terminam aqui pra não duplicar a lógica.
+ * Gera a key (com o prefixo do produto comprado), vincula ao comprador,
+ * marca o pedido como confirmado e manda a key por DM. Usado tanto pelo
+ * clique manual em "Confirmar Pagamento" quanto pela aprovação
+ * automática do Pix — os dois caminhos terminam aqui.
  */
 async function finalizeOrder(client, order, adminId, amountPaid = null) {
     const days = PLAN_DAYS[order.plan];
-    const keyEntry = KeyStore.create({ daysValid: days, note: `venda (${order.plan}) - pedido ${order.id}` });
+    const product = ProductStore.get(order.productId) || ProductStore.ensureDefault();
+    const keyEntry = KeyStore.create({ daysValid: days, note: `venda (${order.plan}) - pedido ${order.id}`, productId: product.id });
     KeyStore.redeem(keyEntry.key, order.discordId);
 
     const result = OrderStore.confirm(order.id, keyEntry.key, adminId, amountPaid);
@@ -147,7 +178,7 @@ async function finalizeOrder(client, order, adminId, amountPaid = null) {
             color: 0x2ecc71,
             imageUrl: SettingsStore.get("purchaseThanksImageUrl") || null,
             description:
-                `Pagamento confirmado — aqui está sua key:\n\n\`${keyEntry.key}\`\n\n` +
+                `Pagamento confirmado — aqui está sua key de **${product.name}**:\n\n\`${keyEntry.key}\`\n\n` +
                 `**Vence em:** ${fmtDate(keyEntry.expiresAt)}\n\n` +
                 `**Como usar:** dentro do jogo, digite \`/key redeem key:${keyEntry.key}\` aqui no Discord ` +
                 `pra vincular ela na sua conta, depois cole a key na tela do hub quando ele carregar.`
@@ -157,20 +188,20 @@ async function finalizeOrder(client, order, adminId, amountPaid = null) {
         dmOk = false;
     }
 
-    logger.action(adminId, `confirmou o pedido ${order.id} e gerou a key ${keyEntry.key} pra <@${order.discordId}>`);
+    logger.action(adminId, `confirmou o pedido ${order.id} (${product.name}) e gerou a key ${keyEntry.key} pra <@${order.discordId}>`);
     await sendActionLog(client, {
         title: "🛒 Pedido confirmado",
         actorId: adminId,
         color: 0x2ecc71,
-        description: `Pedido \`${order.id}\` (${PLAN_LABELS[order.plan]}) — key \`${keyEntry.key}\` gerada pra <@${order.discordId}>. Vencimento: ${fmtDate(keyEntry.expiresAt)}.`
+        description: `Pedido \`${order.id}\` (${product.name} — ${PLAN_LABELS[order.plan]}) — key \`${keyEntry.key}\` gerada pra <@${order.discordId}>. Vencimento: ${fmtDate(keyEntry.expiresAt)}.`
     });
 
     return { ok: true, keyEntry, dmOk };
 }
 
-function couponModal(plan) {
+function couponModal(productId, plan) {
     return new ModalBuilder()
-        .setCustomId(`store_modal:buy:${plan}`)
+        .setCustomId(`store_modal:buy:${productId}:${plan}`)
         .setTitle(`Comprar — ${PLAN_LABELS[plan]}`)
         .addComponents(
             new ActionRowBuilder().addComponents(
@@ -190,19 +221,20 @@ function couponModal(plan) {
  * (incrementa o contador de uso) depois do aceite, não na hora que foi
  * digitado — assim, se a pessoa cancelar, o cupom continua intacto.
  */
-function termsPanel(plan, couponCode) {
-    const terms = SettingsStore.get("termsText") || "Sem termos configurados.";
+function termsPanel(product, plan, couponCode) {
+    const terms = product.termsText || "Sem termos configurados.";
     const container = panel({
         title: "📜 Termos de Uso",
         description:
             `${terms}\n\n` +
-            `**Plano:** ${PLAN_LABELS[plan]} — ${priceLine(plan)}` +
+            `**Produto:** ${product.name}\n` +
+            `**Plano:** ${PLAN_LABELS[plan]} — ${priceLine(product, plan)}` +
             (couponCode ? `\n**Cupom:** \`${couponCode}\`` : ""),
         footer: "Clique em \"Aceito\" pra continuar e abrir seu ticket."
     });
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`store:accept_terms:${plan}:${couponCode || "none"}`).setLabel("✅ Aceito, continuar").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`store:accept_terms:${product.id}:${plan}:${couponCode || "none"}`).setLabel("✅ Aceito, continuar").setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId("store:cancel_terms").setLabel("❌ Cancelar").setStyle(ButtonStyle.Secondary)
     );
 
@@ -223,7 +255,7 @@ async function createTicketThread(interaction, buyer) {
         : interaction.channel;
 
     if (!baseChannel || !baseChannel.isTextBased()) {
-        throw new Error("Canal base pra criar o ticket não foi encontrado ou não é de texto — confere o 'Canal dos tickets' em /admin → Vendas/Loja.");
+        throw new Error("Canal base pra criar o ticket não foi encontrado ou não é de texto — confere o 'Canal dos tickets' em /admin.");
     }
 
     const safeName = buyer.username.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20) || "comprador";
@@ -258,7 +290,7 @@ async function createTicketThread(interaction, buyer) {
  * uso (botão "accept_terms"). O cupom só é consumido aqui, não na hora
  * que a pessoa digitou (senão cancelar a compra desperdiçaria o cupom).
  */
-async function createTicketAndNotify(interaction, plan, couponCode) {
+async function createTicketAndNotify(interaction, product, plan, couponCode) {
     let coupon = null;
     if (couponCode && couponCode !== "none") {
         const result = CouponStore.use(couponCode);
@@ -280,14 +312,15 @@ async function createTicketAndNotify(interaction, plan, couponCode) {
         discordId: interaction.user.id,
         plan,
         channelId: thread.id,
-        couponCode: coupon?.code || null
+        couponCode: coupon?.code || null,
+        productId: product.id
     });
 
     const days = PLAN_DAYS[plan];
     const ticketContainer = panel({
-        title: `🎫 Ticket de compra — ${PLAN_LABELS[plan]}`,
+        title: `🎫 Ticket de compra — ${product.name} (${PLAN_LABELS[plan]})`,
         description:
-            `Olá <@${interaction.user.id}>! Aqui está seu ticket pra comprar o plano **${PLAN_LABELS[plan]}** por **${priceLine(plan)}**.\n\n` +
+            `Olá <@${interaction.user.id}>! Aqui está seu ticket pra comprar **${product.name}**, plano **${PLAN_LABELS[plan]}** por **${priceLine(product, plan)}**.\n\n` +
             (coupon ? `**Cupom aplicado:** \`${coupon.code}\` — ${coupon.discountText || "desconto combinado com o admin"}\n\n` : "") +
             `Combine a forma de pagamento com a administração. Referência do que já está configurado:\n\n${paymentReferenceText()}`,
         fields: [
@@ -307,24 +340,32 @@ async function createTicketAndNotify(interaction, plan, couponCode) {
     await sendActionLog(interaction.client, {
         title: "🎫 Novo ticket de compra",
         actorId: interaction.user.id,
-        description: `Pedido \`${order.id}\` — plano **${PLAN_LABELS[plan]}** — ${thread}${coupon ? ` — cupom \`${coupon.code}\`` : ""}.`
+        description: `Pedido \`${order.id}\` — ${product.name} (${PLAN_LABELS[plan]}) — ${thread}${coupon ? ` — cupom \`${coupon.code}\`` : ""}.`
     });
 }
 
 async function handleButton(interaction) {
-    const [, action, param, param2] = interaction.customId.split(":");
+    const parts = interaction.customId.split(":");
+    const action = parts[1];
+
+    if (action === "viewproduct") {
+        const product = ProductStore.get(parts[2]);
+        if (!product) return interaction.reply({ content: "❌ Produto não encontrado.", ephemeral: true });
+        return interaction.update(productPlanPanel(product));
+    }
 
     if (action === "buy") {
-        const plan = param;
-        if (!PLAN_LABELS[plan]) {
-            return interaction.reply({ content: "❌ Plano inválido.", ephemeral: true });
+        const [productId, plan] = [parts[2], parts[3]];
+        const product = ProductStore.get(productId);
+        if (!product || !PLAN_LABELS[plan]) {
+            return interaction.reply({ content: "❌ Produto ou plano inválido.", ephemeral: true });
         }
         if (!interaction.inGuild()) {
             return interaction.reply({ content: "❌ Isso só funciona dentro do servidor.", ephemeral: true });
         }
 
         // Rate limit: só 1 ticket aberto por vez por pessoa, pra ninguém
-        // ficar clicando nos 4 planos e empilhando threads vazias.
+        // ficar clicando nos planos e empilhando threads vazias.
         const existing = OrderStore.listOpen().find(o => o.discordId === interaction.user.id);
         if (existing) {
             return interaction.reply({
@@ -333,19 +374,18 @@ async function handleButton(interaction) {
             });
         }
 
-        return interaction.showModal(couponModal(plan));
+        return interaction.showModal(couponModal(productId, plan));
     }
 
     if (action === "accept_terms") {
-        const plan = param;
-        const couponCode = param2;
-        if (!PLAN_LABELS[plan]) {
-            return interaction.reply({ content: "❌ Plano inválido.", ephemeral: true });
+        const [productId, plan, couponCode] = [parts[2], parts[3], parts[4]];
+        const product = ProductStore.get(productId);
+        if (!product || !PLAN_LABELS[plan]) {
+            return interaction.reply({ content: "❌ Produto ou plano inválido.", ephemeral: true });
         }
 
         // Confirma o rate limit de novo aqui (pode ter passado tempo entre
-        // abrir os termos e clicar em Aceito, e a pessoa pode ter aberto
-        // outro ticket nesse meio-tempo por outro caminho).
+        // abrir os termos e clicar em Aceito).
         const existing = OrderStore.listOpen().find(o => o.discordId === interaction.user.id);
         if (existing) {
             const container = panel({ title: "❌ Você já tem um ticket aberto", description: `<#${existing.channelId}>` });
@@ -353,7 +393,7 @@ async function handleButton(interaction) {
         }
 
         await interaction.deferUpdate();
-        return createTicketAndNotify(interaction, plan, couponCode);
+        return createTicketAndNotify(interaction, product, plan, couponCode);
     }
 
     if (action === "cancel_terms") {
@@ -362,21 +402,23 @@ async function handleButton(interaction) {
     }
 
     if (action === "autopix") {
+        const orderId = parts[2];
         if (!isAdmin(interaction)) {
             return interaction.reply({ content: "❌ Só admins podem gerar o Pix.", ephemeral: true });
         }
-        if (!OrderStore.get(param)) {
+        if (!OrderStore.get(orderId)) {
             return interaction.reply({ content: "❌ Pedido não encontrado.", ephemeral: true });
         }
-        return interaction.showModal(autopixModal(param));
+        return interaction.showModal(autopixModal(orderId));
     }
 
     if (action === "confirm" || action === "reject") {
+        const orderId = parts[2];
         if (!isAdmin(interaction)) {
             return interaction.reply({ content: "❌ Só admins podem confirmar/rejeitar pedidos.", ephemeral: true });
         }
 
-        const order = OrderStore.get(param);
+        const order = OrderStore.get(orderId);
         if (!order) {
             const container = panel({ title: "❌ Pedido não encontrado", description: "Esse pedido não existe mais." });
             return interaction.update(v2Payload(container, []));
@@ -428,7 +470,8 @@ async function handleButton(interaction) {
     }
 
     if (action === "close") {
-        const order = OrderStore.get(param);
+        const orderId = parts[2];
+        const order = OrderStore.get(orderId);
         const isBuyer = order && order.discordId === interaction.user.id;
         if (!isAdmin(interaction) && !isBuyer) {
             return interaction.reply({ content: "❌ Só o comprador ou um admin pode fechar esse ticket.", ephemeral: true });
@@ -445,14 +488,17 @@ async function handleButton(interaction) {
 }
 
 async function handleModalSubmit(interaction) {
-    const [, action, param] = interaction.customId.split(":");
+    const parts = interaction.customId.split(":");
+    const action = parts[1];
 
     if (action === "autopix") {
-        return handleAutopixSubmit(interaction, param);
+        return handleAutopixSubmit(interaction, parts[2]);
     }
 
-    const plan = param;
-    if (action !== "buy" || !PLAN_LABELS[plan]) return;
+    if (action !== "buy") return;
+    const [productId, plan] = [parts[2], parts[3]];
+    const product = ProductStore.get(productId);
+    if (!product || !PLAN_LABELS[plan]) return;
 
     const codigoDigitado = interaction.fields.getTextInputValue("cupom")?.trim();
     let couponCode = null;
@@ -472,7 +518,7 @@ async function handleModalSubmit(interaction) {
         couponCode = result.entry.code;
     }
 
-    const payload = termsPanel(plan, couponCode);
+    const payload = termsPanel(product, plan, couponCode);
     return interaction.reply({ ...payload, flags: payload.flags | MessageFlags.Ephemeral });
 }
 
@@ -500,11 +546,13 @@ async function handleAutopixSubmit(interaction, orderId) {
 
     await interaction.deferReply({ ephemeral: true });
 
+    const product = ProductStore.get(order.productId) || ProductStore.ensureDefault();
+
     let charge;
     try {
         charge = await pixProvider.createPixCharge({
             amount: valor,
-            description: `1NXITER HUB — ${PLAN_LABELS[order.plan]} — pedido ${order.id}`
+            description: `${product.name} — ${PLAN_LABELS[order.plan]} — pedido ${order.id}`
         });
     } catch (err) {
         logger.error(`Falha ao gerar Pix -> ${err.message}`);

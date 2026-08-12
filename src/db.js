@@ -82,6 +82,18 @@ db.exec(`
         closedAt INTEGER,
         closedBy TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        prefix TEXT NOT NULL DEFAULT '1NX',
+        description TEXT NOT NULL DEFAULT '',
+        imageUrl TEXT NOT NULL DEFAULT '',
+        termsText TEXT NOT NULL DEFAULT '',
+        plans TEXT NOT NULL DEFAULT '{}',
+        active INTEGER NOT NULL DEFAULT 1,
+        createdAt INTEGER NOT NULL
+    );
 `);
 
 // ALTER TABLE ADD COLUMN falha se a coluna já existir — como essas
@@ -91,7 +103,9 @@ for (const stmt of [
     `ALTER TABLE orders ADD COLUMN lastActivityAt INTEGER`,
     `ALTER TABLE orders ADD COLUMN amountPaid REAL`,
     `ALTER TABLE keys ADD COLUMN renewalNotifiedAt INTEGER`,
-    `ALTER TABLE support_tickets ADD COLUMN type TEXT`
+    `ALTER TABLE support_tickets ADD COLUMN type TEXT`,
+    `ALTER TABLE keys ADD COLUMN productId TEXT`,
+    `ALTER TABLE orders ADD COLUMN productId TEXT`
 ]) {
     try {
         db.exec(stmt);

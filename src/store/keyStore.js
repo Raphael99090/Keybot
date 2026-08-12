@@ -1,9 +1,9 @@
 const crypto = require("crypto");
 const db = require("../db");
 
-function generateKeyString() {
+function generateKeyString(prefix = "1NX") {
     const part = () => crypto.randomBytes(2).toString("hex").toUpperCase();
-    return `1NX-${part()}-${part()}-${part()}`;
+    return `${prefix}-${part()}-${part()}-${part()}`;
 }
 
 function rowToEntry(row) {
@@ -12,7 +12,7 @@ function rowToEntry(row) {
 }
 
 const stmts = {
-    insert: db.prepare(`INSERT INTO keys (key, discordId, hwid, createdAt, expiresAt, revoked, note, lastHwidReset) VALUES (?, NULL, NULL, ?, ?, 0, ?, NULL)`),
+    insert: db.prepare(`INSERT INTO keys (key, discordId, hwid, createdAt, expiresAt, revoked, note, lastHwidReset, productId) VALUES (?, NULL, NULL, ?, ?, 0, ?, NULL, ?)`),
     get: db.prepare(`SELECT * FROM keys WHERE key = ?`),
     all: db.prepare(`SELECT * FROM keys`),
     revoke: db.prepare(`UPDATE keys SET revoked = 1 WHERE key = ?`),
@@ -32,16 +32,26 @@ const stmts = {
  */
 
 const KeyStore = {
-    /** Cria uma key nova. daysValid = null significa "nunca expira". */
-    create({ daysValid = null, note = "" } = {}) {
+    /**
+     * Cria uma key nova. daysValid = null significa "nunca expira".
+     * productId define o prefixo (ex: "1NX-...", "OUTRO-..."); sem
+     * productId, usa o produto padrão (compatibilidade com instalações
+     * de antes do multi-produto).
+     */
+    create({ daysValid = null, note = "", productId = null } = {}) {
+        const ProductStore = require("./productStore");
+        const product = productId ? ProductStore.get(productId) : ProductStore.ensureDefault();
+        const prefix = product?.prefix || "1NX";
+        const finalProductId = product?.id || null;
+
         let key;
         do {
-            key = generateKeyString();
+            key = generateKeyString(prefix);
         } while (stmts.get.get(key));
 
         const now = Date.now();
         const expiresAt = daysValid ? now + daysValid * 86400000 : null;
-        stmts.insert.run(key, now, expiresAt, note);
+        stmts.insert.run(key, now, expiresAt, note, finalProductId);
         return rowToEntry(stmts.get.get(key));
     },
 

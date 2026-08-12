@@ -11,6 +11,7 @@ const OrderStore = require("../store/orderStore");
 const SupportStore = require("../store/supportStore");
 const { startTicketSweeper } = require("./ticketSweeper");
 const { startRenewalReminder } = require("./renewalReminder");
+const { respondInSupportTicket } = require("../ai/grokSupport");
 
 function createClient() {
     // GuildMessages só pra saber QUE uma mensagem chegou (marcar
@@ -104,6 +105,7 @@ function createClient() {
         const ticket = SupportStore.getByChannel(message.channel.id);
         if (ticket && ticket.status === "open") {
             SupportStore.touchActivity(ticket.id);
+            respondInSupportTicket(message).catch(err => logger.warn(`IA no ticket falhou -> ${err.message}`));
         }
     });
 

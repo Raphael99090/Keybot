@@ -15,13 +15,6 @@ const DEFAULTS = {
     // Canal onde os tickets de compra (threads) são criados. Vazio = usa
     // o canal onde /comprar foi digitado.
     ticketChannelId: null,
-    // Texto configurável que aparece no topo da loja (/comprar).
-    shopDescription: "",
-    // URL de imagem mostrada na loja (/comprar). Vazio = sem imagem.
-    shopImageUrl: "",
-    // Termos de uso / política de reembolso mostrados antes de criar o
-    // ticket — o comprador precisa clicar "Aceito" pra continuar.
-    termsText: "Ao comprar, você concorda que a key é de uso pessoal e não é reembolsável após a entrega.",
     // Imagem mostrada na DM de "obrigado pela compra" quando confirma o pedido.
     purchaseThanksImageUrl: "",
     // Canal-base onde os tickets de SUPORTE (diferente do de compra) são
@@ -31,20 +24,16 @@ const DEFAULTS = {
     // no canal — diferente do painel que aparece dentro do ticket).
     supportPanelDescription: "Precisa de ajuda? Clica no botão abaixo pra abrir um ticket com a administração.",
     supportPanelImageUrl: "",
-    // Preço mostrado em cada botão de plano. Texto livre (ex: "R$ 15,00").
-    plans: {
-        day: "",
-        week: "",
-        month: "",
-        lifetime: ""
-    },
     // Instruções de pagamento mostradas dentro do ticket (referência).
     paymentInfo: {
         pix: "",
         btc: "",
         card: "",
         local: ""
-    }
+    },
+    // Prompt de sistema da IA (Grok) que responde automaticamente nos
+    // tickets de suporte.
+    grokSystemPrompt: "Você é um assistente de suporte do 1NXITER HUB. Seja educado, direto e breve. Se não souber a resposta ou o assunto for financeiro/sensível, diga que um admin vai responder em breve."
 };
 
 const PLAN_LABELS = {
@@ -115,19 +104,6 @@ const SettingsStore = {
         if (!(method in PAYMENT_METHODS)) return false;
         const data = readOne("paymentInfo") || {};
         writeOne("paymentInfo", { ...data, [method]: text });
-        return true;
-    },
-
-    /** Preço configurado pra um plano ("day"|"week"|"month"|"lifetime"). */
-    getPlanPrice(plan) {
-        return readOne("plans")?.[plan] || "";
-    },
-
-    /** Define o preço de um plano específico. */
-    setPlanPrice(plan, price) {
-        if (!(plan in PLAN_LABELS)) return false;
-        const data = readOne("plans") || {};
-        writeOne("plans", { ...data, [plan]: price });
         return true;
     },
 

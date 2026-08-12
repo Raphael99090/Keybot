@@ -1,5 +1,33 @@
 # Changelog — 1NXITER KeyBot
 
+## v5.0.0 — Multi-produto, Painel Reorganizado e IA no Suporte
+
+### ⚠️ Breaking changes
+- **Sistema virou multi-produto.** `shopDescription`, `shopImageUrl`,
+  `plans` e `termsText` saíram do settings global e agora vivem em
+  cada **produto** (`/admin → Produtos`), com preço, imagem, descrição
+  e termos próprios. Instalações antigas ganham automaticamente um
+  produto padrão "1NXITER HUB" (prefixo `1NX`) na primeira vez que o
+  bot sobe com essa versão — nenhuma key antiga quebra, mas as
+  configurações antigas de loja precisam ser recadastradas dentro do
+  produto padrão.
+- **`/admin` reorganizado em seções** (Keys, Códigos de Reset,
+  Produtos, Pagamentos, Cupons, Configurações, Estatísticas) em vez de
+  botões soltos na tela principal.
+
+### Adicionado
+- **Multi-produto**: cada produto tem seu próprio **prefixo de key**
+  (ex: `1NX-...`, `OUTRO-...`), preços por plano, descrição, imagem e
+  termos de uso. `/comprar` mostra um catálogo se houver mais de 1
+  produto ativo, ou vai direto pros planos se só tiver 1 (sem clique
+  extra pro caso comum).
+- **IA (Grok/xAI) sempre ativa nos tickets de suporte**: responde
+  automaticamente a cada mensagem nova, com contexto das últimas 10
+  mensagens do ticket. Desativada por padrão — só liga com
+  `GROK_API_KEY` no `.env`.
+- `/admin → Keys → Gerar Key` agora aceita escolher o produto (campo
+  opcional no modal; vazio = produto padrão).
+
 ## v4.1.0 — PushinPay como gateway de Pix automático
 
 ### Adicionado

@@ -10,6 +10,7 @@ const SettingsStore = require("../store/settingsStore");
 const ReviewStore = require("../store/reviewStore");
 const logger = require("../utils/logger");
 const { panel, v2Payload } = require("./v2");
+const { COLORS } = require("./theme");
 
 const { PLAN_LABELS } = SettingsStore;
 
@@ -76,6 +77,7 @@ async function handleModalSubmit(interaction) {
 
     const container = panel({
         title: "🙏 Obrigado pela avaliação!",
+        color: COLORS.success,
         description: `Você avaliou com ${"⭐".repeat(stars)}${comentario ? `\n\n_"${comentario}"_` : ""}`
     });
 

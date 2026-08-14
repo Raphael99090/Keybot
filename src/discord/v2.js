@@ -7,6 +7,7 @@ const {
     MediaGalleryItemBuilder,
     MessageFlags
 } = require("discord.js");
+const { COLORS } = require("./theme");
 
 function textDisplay(content) {
     return new TextDisplayBuilder().setContent(content);
@@ -23,7 +24,7 @@ function separator(spacing = SeparatorSpacingSize.Small, divider = true) {
  * vira uma linha em negrito), um rodapé opcional e uma imagem opcional
  * (URL — mostrada como galeria de mídia dentro do próprio container).
  */
-function panel({ title, description = null, fields = [], color = 0x8a3ffc, footer = null, imageUrl = null }) {
+function panel({ title, description = null, fields = [], color = COLORS.primary, footer = null, imageUrl = null }) {
     const container = new ContainerBuilder().setAccentColor(color);
 
     container.addTextDisplayComponents(textDisplay(`### ${title}`));

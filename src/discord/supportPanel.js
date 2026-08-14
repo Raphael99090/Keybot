@@ -13,6 +13,7 @@ const SupportStore = require("../store/supportStore");
 const { isAdmin } = require("../utils/permissions");
 const logger = require("../utils/logger");
 const { panel, v2Payload } = require("./v2");
+const { COLORS } = require("./theme");
 const { sendActionLog } = require("./logNotifier");
 const { postTicketTranscript } = require("./transcript");
 const config = require("../config");
@@ -29,7 +30,7 @@ function fixedPanel() {
         title: "🎫 Central de Suporte",
         description,
         imageUrl: SettingsStore.get("supportPanelImageUrl") || null,
-        color: 0x5865f2
+        color: COLORS.voice
     });
 
     const row = new ActionRowBuilder().addComponents(
@@ -261,7 +262,7 @@ async function handleModalSubmit(interaction) {
 
         const container = panel({
             title: `🎫 Ticket de suporte — ${TYPE_LABELS[type]}`,
-            color: 0x5865f2,
+            color: COLORS.voice,
             description: `Olá <@${interaction.user.id}>! Um admin vai te atender aqui em breve.\n\n**Assunto:**\n${subject}`,
             footer: isPrivate ? `Ticket ${ticket.id} — thread privada.` : `Ticket ${ticket.id} — thread pública (servidor sem boost nível 2).`
         });
@@ -272,7 +273,7 @@ async function handleModalSubmit(interaction) {
         await sendActionLog(interaction.client, {
             title: "🎫 Novo ticket de suporte",
             actorId: interaction.user.id,
-            color: 0x5865f2,
+            color: COLORS.voice,
             description: `Ticket \`${ticket.id}\` (${TYPE_LABELS[type]}) — ${thread}\n**Assunto:** ${subject}`
         });
         return;

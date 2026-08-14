@@ -5,6 +5,7 @@ const ResetCodeStore = require("../../store/resetCodeStore");
 const TrialStore = require("../../store/trialStore");
 const { fmtDuration, fmtDate } = require("../../utils/format");
 const { panel, v2Payload } = require("../v2");
+const { COLORS } = require("../theme");
 
 function statusOf(entry) {
     if (entry.revoked) return "🔴 Revogada";
@@ -153,7 +154,7 @@ module.exports = {
 
             const container = panel({
                 title: "🎁 Key de trial",
-                color: 0xf1c40f,
+                color: COLORS.warning,
                 fields: [
                     { name: "Key", value: `\`${entry.key}\`` },
                     { name: "Validade", value: fmtDate(entry.expiresAt) }

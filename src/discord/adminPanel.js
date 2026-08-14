@@ -18,6 +18,7 @@ const ProductStore = require("../store/productStore");
 const { isAdmin } = require("../utils/permissions");
 const logger = require("../utils/logger");
 const { panel, v2Payload } = require("./v2");
+const { COLORS } = require("./theme");
 const { sendActionLog } = require("./logNotifier");
 const { fmtDate } = require("../utils/format");
 
@@ -297,7 +298,7 @@ function couponsPanel() {
 
     const container = panel({
         title: `🎟️ Cupons (${all.length})`,
-        color: 0x2ecc71,
+        color: COLORS.success,
         description: lines,
         footer: all.length > 20 ? "Mostrando os 20 primeiros" : null
     });
@@ -456,7 +457,7 @@ const MODALS = {
 
 /** Painel de confirmação genérico, usado antes de qualquer ação destrutiva. */
 function confirmPanel({ title, description, confirmCustomId, confirmLabel = "Confirmar", danger = true, cancelCustomId = "admin:back" }) {
-    const container = panel({ title, description, color: danger ? 0xe74c3c : 0x8a3ffc });
+    const container = panel({ title, description, color: danger ? COLORS.error : COLORS.primary });
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(confirmCustomId).setLabel(confirmLabel).setStyle(danger ? ButtonStyle.Danger : ButtonStyle.Primary).setEmoji("✅"),
@@ -564,7 +565,7 @@ async function handleButton(interaction) {
         const container = panel({
             title: `🔓 Códigos de reset (${all.length})`,
             description: lines,
-            color: 0x2ecc71,
+            color: COLORS.success,
             footer: all.length > 25 ? "Mostrando os 25 primeiros" : null
         });
         return interaction.update(v2Payload(container, [backRow("admin:resetcodes", "⬅️ Voltar pra Códigos de Reset")]));
@@ -778,7 +779,7 @@ async function handleModalSubmit(interaction) {
         const entry = ResetCodeStore.create({ note: nota });
         const container = panel({
             title: "🔓 Código de reset gerado",
-            color: 0x2ecc71,
+            color: COLORS.success,
             fields: [{ name: "Código", value: `\`${entry.code}\`` }, { name: "Nota", value: nota || "—" }],
             footer: "Manda esse código pra quem comprou — usa em /key resethwid codigo:"
         });
@@ -908,7 +909,7 @@ async function handleModalSubmit(interaction) {
         const removidas = KeyStore.deleteAll();
         const container = panel({
             title: "🗑️ Todas as keys foram apagadas",
-            color: 0xe74c3c,
+            color: COLORS.error,
             description: `${removidas.length} key(s) removida(s) do banco. Essa ação não tem volta — se precisar recuperar, use o backup mais recente em \`data/backups/\`, se existir.`
         });
         await respondToPanel(interaction, v2Payload(container, [backRow("admin:keys", "⬅️ Voltar pra Keys")]));
@@ -917,7 +918,7 @@ async function handleModalSubmit(interaction) {
         return sendActionLog(interaction.client, {
             title: "🗑️⚠️ TODAS as keys foram apagadas",
             actorId: interaction.user.id,
-            color: 0xe74c3c,
+            color: COLORS.error,
             description: `${removidas.length} key(s) removida(s) permanentemente.${removidas.length ? `\n\n${removidas.slice(0, 30).join(", ")}${removidas.length > 30 ? "…" : ""}` : ""}`
         });
     }

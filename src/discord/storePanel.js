@@ -18,6 +18,7 @@ const { isAdmin } = require("../utils/permissions");
 const { fmtDate } = require("../utils/format");
 const logger = require("../utils/logger");
 const { panel, v2Payload } = require("./v2");
+const { COLORS } = require("./theme");
 const { sendActionLog } = require("./logNotifier");
 const pixProvider = require("../payments/pixProvider");
 const { sendSatisfactionSurvey } = require("./surveyPanel");
@@ -175,7 +176,7 @@ async function finalizeOrder(client, order, adminId, amountPaid = null) {
         const buyer = await client.users.fetch(order.discordId);
         const dmContainer = panel({
             title: "🔑 Sua key chegou!",
-            color: 0x2ecc71,
+            color: COLORS.success,
             imageUrl: SettingsStore.get("purchaseThanksImageUrl") || null,
             description:
                 `Pagamento confirmado — aqui está sua key de **${product.name}**:\n\n\`${keyEntry.key}\`\n\n` +
@@ -192,7 +193,7 @@ async function finalizeOrder(client, order, adminId, amountPaid = null) {
     await sendActionLog(client, {
         title: "🛒 Pedido confirmado",
         actorId: adminId,
-        color: 0x2ecc71,
+        color: COLORS.success,
         description: `Pedido \`${order.id}\` (${product.name} — ${PLAN_LABELS[order.plan]}) — key \`${keyEntry.key}\` gerada pra <@${order.discordId}>. Vencimento: ${fmtDate(keyEntry.expiresAt)}.`
     });
 
@@ -432,7 +433,7 @@ async function handleButton(interaction) {
 
             const doneContainer = panel({
                 title: "✅ Pedido confirmado",
-                color: 0x2ecc71,
+                color: COLORS.success,
                 fields: [
                     { name: "Pedido", value: `\`${order.id}\`` },
                     { name: "Key gerada", value: `\`${result.keyEntry.key}\`` },
@@ -453,7 +454,7 @@ async function handleButton(interaction) {
 
             const rejectedContainer = panel({
                 title: "❌ Pedido rejeitado",
-                color: 0xe74c3c,
+                color: COLORS.error,
                 fields: [{ name: "Pedido", value: `\`${order.id}\`` }, { name: "Comprador", value: `<@${order.discordId}>` }]
             });
             await interaction.update(v2Payload(rejectedContainer, [closeRow(order.id)]));
@@ -462,7 +463,7 @@ async function handleButton(interaction) {
             await sendActionLog(interaction.client, {
                 title: "🛒 Pedido rejeitado",
                 actorId: interaction.user.id,
-                color: 0xe74c3c,
+                color: COLORS.error,
                 description: `Pedido \`${order.id}\` (${PLAN_LABELS[order.plan]}) — comprador <@${order.discordId}>.`
             });
             return;
@@ -567,7 +568,7 @@ async function handleAutopixSubmit(interaction, orderId) {
     const attachment = new AttachmentBuilder(Buffer.from(charge.qrCodeBase64, "base64"), { name: "pix.png" });
     const pixContainer = panel({
         title: "💠 Pix gerado",
-        color: 0x00b0f0,
+        color: COLORS.pix,
         description:
             `Valor: **R$ ${valor.toFixed(2)}**\n\n` +
             `Escaneia o QR Code acima ou copia o código abaixo no app do seu banco:\n\n` +
@@ -605,7 +606,7 @@ async function handleAutopixSubmit(interaction, orderId) {
 
             const doneContainer = panel({
                 title: "✅ Pagamento aprovado automaticamente",
-                color: 0x2ecc71,
+                color: COLORS.success,
                 fields: [
                     { name: "Pedido", value: `\`${order.id}\`` },
                     { name: "Key gerada", value: `\`${result.keyEntry.key}\`` },

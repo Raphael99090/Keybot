@@ -7,6 +7,8 @@ const SettingsStore = require("../../store/settingsStore");
 const ResetCodeStore = require("../../store/resetCodeStore");
 const CouponStore = require("../../store/couponStore");
 const ReviewStore = require("../../store/reviewStore");
+const ProductStore = require("../../store/productStore");
+const SupportStore = require("../../store/supportStore");
 const { dashboardPassword } = require("../../config");
 
 const router = express.Router();
@@ -39,6 +41,14 @@ router.get("/stats", (req, res) => {
         porPlano[plan] = { label: PLAN_LABELS[plan], vendas: confirmados.filter(o => o.plan === plan).length };
     }
 
+    const porProduto = ProductStore.list().map(p => ({
+        id: p.id,
+        nome: p.name,
+        vendas: confirmados.filter(o => o.productId === p.id).length
+    }));
+
+    const ticketsSuporte = SupportStore.list();
+
     res.json({
         keys: {
             total: keys.length,
@@ -54,8 +64,14 @@ router.get("/stats", (req, res) => {
         },
         vendas: {
             porPlano,
+            porProduto,
             totalConfirmadas: confirmados.length,
             faturamento: confirmados.reduce((sum, o) => sum + (o.amountPaid || 0), 0)
+        },
+        suporte: {
+            total: ticketsSuporte.length,
+            abertos: ticketsSuporte.filter(t => t.status === "open").length,
+            fechados: ticketsSuporte.filter(t => t.status === "closed").length
         },
         avaliacoes: {
             media: ReviewStore.averageStars(),
@@ -78,6 +94,14 @@ router.get("/coupons", (req, res) => {
 
 router.get("/reviews", (req, res) => {
     res.json(ReviewStore.list().sort((a, b) => b.createdAt - a.createdAt));
+});
+
+router.get("/products", (req, res) => {
+    res.json(ProductStore.list());
+});
+
+router.get("/support", (req, res) => {
+    res.json(SupportStore.list().sort((a, b) => b.createdAt - a.createdAt));
 });
 
 /** Últimas N linhas do log em arquivo (padrão 200, máx 1000). */
